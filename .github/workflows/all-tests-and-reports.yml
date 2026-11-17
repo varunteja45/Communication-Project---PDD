@@ -94,8 +94,13 @@ jobs:
           if [ -d "AECCDE web application/appium-tests" ]; then
             cd "AECCDE web application/appium-tests"
             npm install || true
-            node -c appium-tests.js || true
-            node -c tests/mobile-e2e-tests.js || true
+            npm install -g appium || true
+            appium driver install uiautomator2 || true
+            appium --port 4723 &
+            APPIUM_PID=$!
+            sleep 3
+            node appium-tests.js || true
+            kill $APPIUM_PID || true
             cd ../..
           fi
           # Run Excel Generator for Test 2
