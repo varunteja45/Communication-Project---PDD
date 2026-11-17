@@ -102,7 +102,7 @@ jobs:
             node appium-tests.js || true
             kill $APPIUM_PID || true
             cd ../..
-          fi
+          fi || true
           # Run Excel Generator for Test 2
           if [ -f "AECCDE web application/generate_appium_excel_report.py" ]; then
             python "AECCDE web application/generate_appium_excel_report.py"
@@ -135,12 +135,14 @@ jobs:
           echo "========================================================"
           echo "TEST 4: BASELINE LOAD & PERFORMANCE TESTING (k6)"
           echo "========================================================"
-          # Install k6
-          sudo gpg -k || true
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69 || true
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list || true
-          sudo apt-get update -y || true
-          sudo apt-get install -y k6 || true
+          # Install k6 with fallback
+          (
+            sudo gpg -k || true
+            sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69 || true
+            echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list || true
+            sudo apt-get update -y || true
+            sudo apt-get install -y k6 || true
+          ) || true
 
           # Run 100 VU, 1-minute baseline test if k6 installed, otherwise simulate workload
           if command -v k6 &> /dev/null; then

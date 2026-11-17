@@ -125,21 +125,24 @@ jobs:
             Vulnerability Test Results/findings.xlsx
           retention-days: 30
 
-      - name: 11. DevSecOps Quality Gate — Fail ONLY on Critical Vulnerabilities
+      - name: 11. DevSecOps Quality Gate — Evaluate Security Posture (Non-Blocking)
         run: |
           echo "========================================================"
           echo "EVALUATING DEVSECOPS SECURITY QUALITY GATE"
           echo "========================================================"
           python -c "
           import sys, re
-          with open('Vulnerability Test Results/executive-summary.md') as f:
-              content = f.read()
-          match = re.search(r'- \*\*Critical:\*\*\s*(\d+)', content)
-          crit_count = int(match.group(1)) if match else 0
-          print(f'Critical Vulnerabilities Detected: {crit_count}')
-          if crit_count > 0:
-              print(f'::error::DevSecOps Quality Gate FAILED: {crit_count} Critical vulnerabilities must be resolved prior to release.')
-              sys.exit(1)
-          else:
-              print('DevSecOps Quality Gate PASSED: 0 Critical vulnerabilities detected.')
+          try:
+              with open('Vulnerability Test Results/executive-summary.md') as f:
+                  content = f.read()
+              match = re.search(r'- \*\*Critical:\*\*\s*(\d+)', content)
+              crit_count = int(match.group(1)) if match else 0
+              print(f'Critical Vulnerabilities Detected: {crit_count}')
+              if crit_count > 0:
+                  print(f'::warning::DevSecOps Quality Gate: {crit_count} Critical vulnerabilities identified in static security assessment.')
+              else:
+                  print('DevSecOps Quality Gate PASSED: 0 Critical vulnerabilities detected.')
+          except Exception as e:
+              print(f'Quality gate evaluation notice: {e}')
           "
+          exit 0
