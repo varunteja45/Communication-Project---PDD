@@ -1,0 +1,6 @@
+- [x] Create `lib/screens/language_selection_screen.dart` based on screenshot
+- [x] Create `lib/screens/set_goals_screen.dart` based on screenshot
+- [x] Link `LanguageSelectionScreen` to `SetGoalsScreen`
+- [/] Implement Profile Setup Screen
+- [ ] Implement Home/Dashboard Screen
+- [ ] Link full onboarding flow

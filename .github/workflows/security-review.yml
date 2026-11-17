@@ -1,0 +1,145 @@
+name: Backend Security Review & DevSecOps Gate
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  security-assessment:
+    name: Automated Security Assessment & Vulnerability Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: 2. Set Up Python Runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 3. Set Up Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 4. Phase 1 — Detect Backend Technology Stack Automatically
+        id: detect_stack
+        run: |
+          echo "========================================================"
+          echo "PHASE 1: AUTOMATIC BACKEND TECHNOLOGY STACK DETECTION"
+          echo "========================================================"
+          python tools/security/detect_backend.py . > detected_stack.json
+          cat detected_stack.json
+          
+          FRAMEWORK=$(python -c "import json; print(json.load(open('detected_stack.json')).get('framework', 'Unknown'))")
+          LANGUAGE=$(python -c "import json; print(json.load(open('detected_stack.json')).get('language', 'Unknown'))")
+          echo "Detected Framework: $FRAMEWORK"
+          echo "Detected Language: $LANGUAGE"
+          echo "framework=$FRAMEWORK" >> $GITHUB_OUTPUT
+          echo "language=$LANGUAGE" >> $GITHUB_OUTPUT
+
+      - name: 5. Phase 2 & 3 — Run Static Application Security Testing (SAST)
+        run: |
+          echo "========================================================"
+          echo "PHASE 3: STATIC APPLICATION SECURITY TESTING (SAST)"
+          echo "========================================================"
+          # Run Semgrep SAST Scan with fallback
+          python -m pip install --upgrade pip
+          pip install semgrep || true
+          if command -v semgrep &> /dev/null; then
+            semgrep scan --config auto --json --output sast-semgrep-results.json . || true
+          else
+            echo "Semgrep unavailable; continuing with custom SAST engine."
+          fi
+
+      - name: 6. Phase 5 — Run Dependency & Supply Chain Scan
+        run: |
+          echo "========================================================"
+          echo "PHASE 5: DEPENDENCY & SUPPLY CHAIN SECURITY SCAN"
+          echo "========================================================"
+          if [ -f "AECCDE web application/package.json" ]; then
+            cd "AECCDE web application"
+            npm audit --json > ../dependency-audit-npm.json || true
+            cd ..
+          elif [ -f "package.json" ]; then
+            npm audit --json > dependency-audit-npm.json || true
+          fi
+          echo "Dependency audit completed."
+
+      - name: 7. Phase 4 — Run Dynamic API Security Testing (DAST)
+        run: |
+          echo "========================================================"
+          echo "PHASE 4: DYNAMIC APPLICATION SECURITY TESTING (DAST)"
+          echo "========================================================"
+          # Check if we can spin up backend for live API probing
+          if [ -f "AECCDE web application/server.js" ]; then
+            echo "Starting AECCDE Node.js Backend Server on port 3000..."
+            cd "AECCDE web application"
+            npm install --production || true
+            node server.js &
+            SERVER_PID=$!
+            cd ..
+            sleep 3
+            python tools/security/api_security_scanner.py "http://localhost:3000" || true
+            kill $SERVER_PID || true
+          else
+            python tools/security/api_security_scanner.py "http://localhost:3000" || true
+          fi
+
+      - name: 8. Phase 6, 7 & 8 — Generate All Security Reports & Excel Workbooks
+        run: |
+          echo "========================================================"
+          echo "GENERATING DETAILED SECURITY REPORTS & ARTIFACTS"
+          echo "========================================================"
+          python tools/security/generate_security_reports.py
+          ls -la "Vulnerability Test Results"
+
+      - name: 9. Publish GitHub Action Step Summary
+        run: |
+          echo "========================================================"
+          echo "PUBLISHING GITHUB STEP SUMMARY"
+          echo "========================================================"
+          if [ -f "Vulnerability Test Results/executive-summary.md" ]; then
+            cat "Vulnerability Test Results/executive-summary.md" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 10. Upload Security Reports as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aeccde-vulnerability-test-results
+          path: |
+            Vulnerability Test Results/security-review.md
+            Vulnerability Test Results/executive-summary.md
+            Vulnerability Test Results/dependency-report.md
+            Vulnerability Test Results/backend-inventory.md
+            Vulnerability Test Results/endpoint-inventory.xlsx
+            Vulnerability Test Results/findings.xlsx
+          retention-days: 30
+
+      - name: 11. DevSecOps Quality Gate — Fail ONLY on Critical Vulnerabilities
+        run: |
+          echo "========================================================"
+          echo "EVALUATING DEVSECOPS SECURITY QUALITY GATE"
+          echo "========================================================"
+          python -c "
+          import sys, re
+          with open('Vulnerability Test Results/executive-summary.md') as f:
+              content = f.read()
+          match = re.search(r'- \*\*Critical:\*\*\s*(\d+)', content)
+          crit_count = int(match.group(1)) if match else 0
+          print(f'Critical Vulnerabilities Detected: {crit_count}')
+          if crit_count > 0:
+              print(f'::error::DevSecOps Quality Gate FAILED: {crit_count} Critical vulnerabilities must be resolved prior to release.')
+              sys.exit(1)
+          else:
+              print('DevSecOps Quality Gate PASSED: 0 Critical vulnerabilities detected.')
+          "
