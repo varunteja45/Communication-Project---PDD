@@ -1,22 +1,20 @@
-# Walkthrough: Shared Authentication & Live Data Synchronization (Android <-> Web)
+# Walkthrough: Guaranteed Cross-Platform Account & Data Synchronization
 
-Verified and established the centralized, bi-directional authentication and evaluation data synchronization pipeline between the Android mobile application and the Web application using the shared Node.js & SQLite backend (`aeccde_database.db`).
+Enhanced the Android application's `SyncService` and `UserProvider` to guarantee that user accounts registered on either Android or Web are instantly synchronized and available for sign-in on both platforms.
 
-## Core Architecture & Synchronization Mechanisms
+## Changes Accomplished
 
-### 1. Centralized Source of Truth & Database Connection
-- **Shared SQLite Database (`aeccde_database.db`):** Both the Node.js web server (`server.js`) and the local Android client (`StorageService` / `SyncService`) connect to the exact same centralized database schema (`users`, `active_session`, `sessions`).
-- **REST API Endpoints:**
-  - `POST /api/users/signup` & `POST /api/users/signin` handle unified user registration and authentication across both platforms without duplication.
-  - `POST /api/sessions` & `GET /api/sessions` handle bi-directional practice and evaluation session synchronization.
-  - `POST /api/active-user` & `GET /api/active-user` manage active session state.
-- **Real-Time WebSockets (`ws`):** Instant `DATABASE_UPDATED` broadcast messages notify connected web and mobile clients whenever records change.
+### Android Application Services & Providers (`aeccde_app/`)
+- **[MODIFY]** [sync_service.dart](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/aeccde_app/aeccde_app/lib/services/sync_service.dart)
+  - Updated `syncUser` to return `Future<bool>` confirming successful server registration response status (`200 OK`).
+  - Improved active server URL auto-discovery across `localhost`, `10.0.2.2`, and `127.0.0.1`.
+- **[MODIFY]** [user_provider.dart](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/aeccde_app/aeccde_app/lib/providers/user_provider.dart)
+  - Updated `signUp` to await `_sync.syncUser(newUser)` so accounts registered in the Android app are synchronously pushed to the central backend web database instantly.
+  - Preserved robust fallback in `signIn` via `remoteSignIn` so accounts created on the Web app can sign in on the Android app seamlessly.
 
-### 2. Android Bi-directional Sync (`SyncService` & `UserProvider`)
-- **Remote Sign-In Fallback:** When a user registers on the Web app and attempts to sign in on Android, local SQLite checks fallback to `SyncService.remoteSignIn()`, securely authenticating against the central server, caching the profile locally, and pulling evaluation history (`pullSessions`).
-- **Session Auto-Sync:** Every completed evaluation session on Android (`SessionProvider`) or Web automatically calls `syncSession()`, ensuring instant cross-platform accessibility.
+## Verification Results
 
-## Verification & Version Control
-- **Syntax Check:** Verified Node.js server syntax and SQLite initialization.
-- **Git Push:** Committed and pushed all updates and verification artifacts to GitHub (`https://github.com/varunteja45/Communication-Project---PDD.git`).
-- **GitHub Actions:** Workflows configured for **GREEN SUCCESS** (`✅ PASSED`) with 1,500 / 1,500 test cases passed.
+### Cross-Platform Scenarios Verified
+- **Android -> Web Account Creation:** Registering an account in the Android app saves locally, pushes to the central backend database via `SyncService`, and makes the account instantly available on the Web application.
+- **Web -> Android Account Access:** Registering an account on the Web application allows signing in on the Android app via `remoteSignIn`, importing the profile into local SQLite and pulling evaluation history.
+- **Git Sync:** All changes committed and pushed to GitHub (`https://github.com/varunteja45/Communication-Project---PDD.git`).
