@@ -80,7 +80,9 @@ class UserProvider extends ChangeNotifier {
       );
 
       await _storage.saveUser(newUser);
-      _sync.syncUser(newUser);
+      await _sync.syncUser(newUser);
+      await _storage.setActiveUserId(newUser.id);
+      _currentUser = newUser;
     } finally {
       _isLoading = false;
       notifyListeners();

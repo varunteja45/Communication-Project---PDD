@@ -34,10 +34,10 @@ class SyncService {
   }
 
   /// Pushes a newly created user account to the Web Server.
-  Future<void> syncUser(UserModel user) async {
+  Future<bool> syncUser(UserModel user) async {
     try {
       final baseUrl = await activeServerUrl;
-      await http.post(
+      final res = await http.post(
         Uri.parse('$baseUrl/api/users/signup'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -53,8 +53,11 @@ class SyncService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'userId': user.id}),
       );
+
+      return res.statusCode == 200;
     } catch (e) {
       debugPrint('[SyncService] User sync error: $e');
+      return false;
     }
   }
 
