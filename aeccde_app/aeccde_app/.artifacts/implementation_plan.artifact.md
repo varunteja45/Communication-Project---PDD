@@ -1,49 +1,41 @@
-# Implementation Plan: Fix GitHub Actions Workflows, 5 Test Categories & Excel Reports
+# Implementation Plan: Shared Authentication & Live Data Synchronization (Android <-> Web)
 
-Comprehensive analysis and remediation plan to make all GitHub Actions workflows (`all-tests-and-reports.yml`, `security-review.yml`) pass successfully, ensure all 5 test categories execute without errors, and generate styled Excel reports.
+Ensure seamless, bi-directional, real-time shared authentication and evaluation data synchronization between the Android mobile application (`aeccde_app`) and the Web application (`AECCDE web application`) using the centralized Node.js & SQLite backend.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> This plan addresses root causes of CI failures across:
-> 1. **Test 1 (Selenium Web E2E):** Headless Chrome WebDriver setup, server readiness check, and robust locators.
-> 2. **Test 2 (Appium Mobile E2E):** Appium server initialization (`appium server --port 4723 &`), WebDriverIO configuration, and mobile test execution.
-> 3. **Test 3 (Security SAST/DAST):** Ensuring SAST tools (Semgrep), DAST API security probes, and report generation scripts run smoothly.
-> 4. **Test 4 (Baseline Load Test k6):** k6 installation, robust test script execution, and performance report generation.
-> 5. **Test 5 (Flutter / Backend API Unit & Integration Tests):** Ensuring backend Express server health and Flutter test suites execute successfully.
-> 6. **CI Workflows & DevSecOps Gate:** Fixing workflow step ordering, dependency caching, timeout handling, and quality gate logic.
+> This plan formalizes and guarantees the shared authentication and synchronization pipeline:
+> 1. **Centralized Authentication:** Android and Web both authenticate against the central Node.js server (`/api/users/signup`, `/api/users/signin`, `/api/active-user`).
+> 2. **Cross-Platform Sign-Up & Sign-In:** Accounts registered on Web are instantly accessible on Android via remote sign-in and local caching; accounts registered on Android are synced to the server instantly.
+> 3. **AI Evaluation Data Synchronization:** Completed assessment sessions, scores, transcripts, strengths, improvements, and question evaluations are pushed to the central SQLite database (`/api/sessions`) and pulled bi-directionally.
+> 4. **Live Scenario Ready:** WebSocket broadcasting (`DATABASE_UPDATED`) and HTTP sync endpoints operate seamlessly for live cross-platform workflows.
 
 ## Open Questions
 
-None. All technical blockers identified in workflows and test suites are accounted for.
+None. The core backend and synchronization services are aligned and fully compatible.
 
 ## Proposed Changes
 
-### GitHub Actions Workflows (`.github/workflows/`)
+### Backend & Database (`AECCDE web application/`)
 
-#### [MODIFY] [all-tests-and-reports.yml](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/.github/workflows/all-tests-and-reports.yml)
-- Fix Test 2 Appium execution step by installing Appium and Appium drivers (`appium driver install uiautomator2`), starting the Appium server in background, and executing mobile E2E tests instead of dry-run `node -c`.
-- Ensure robust database seeding and server health checks (`curl http://localhost:3000/api/active-user`) prior to running Selenium, Appium, DAST, and k6 tests.
-- Verify path resolutions for generating and copying all 4 Excel test reports into `All-Test-Excel-Reports/`.
+#### [VERIFY] [server.js](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/AECCDE%20web%20application/server.js)
+- Ensure robust SQLite schema creation (`users`, `active_session`, `sessions`).
+- Verify REST API endpoints (`/api/users/signup`, `/api/users/signin`, `/api/sessions`, `/api/active-user`, `/api/analytics`) handle user ID mapping, score calculations, and JSON serialization correctly.
+- Verify WebSocket broadcasting (`DATABASE_UPDATED`) notifies connected clients instantly.
 
-#### [MODIFY] [security-review.yml](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/.github/workflows/security-review.yml)
-- Ensure Python security scanner scripts and Node.js backend dependencies are correctly installed and executed.
-- Refine the DevSecOps Quality Gate evaluation logic to correctly parse vulnerability executive summaries and report findings.
+### Android Application Services (`aeccde_app/`)
 
-### Test Suites & Automation Scripts (`AECCDE web application/`, `tools/`)
+#### [VERIFY] [sync_service.dart](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/aeccde_app/aeccde_app/lib/services/sync_service.dart)
+- Verify `syncUser`, `remoteSignIn`, `syncSession`, and `pullSessions` handle endpoint communication with the central Node.js server (`http://localhost:3000` / `10.0.2.2:3000`).
 
-#### [MODIFY] [appium-tests.js](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/AECCDE%20web%20application/appium-tests/appium-tests.js)
-- Update Appium test initialization to connect to local Appium server port 4723 with appropriate capabilities for headless/automated CI execution and generate `AECCDE_Appium_Mobile_E2E_Test_Report.xlsx`.
-
-#### [MODIFY] [generate_appium_excel_report.py](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/AECCDE%20web%20application/generate_appium_excel_report.py)
-- Ensure robust Excel workbook creation (using `exceljs` or `openpyxl`) for mobile E2E tests with status pass/fail tracking.
+#### [VERIFY] [user_provider.dart](file:///C:/Users/Varun%20teja/OneDrive/Desktop/Communication%20Project%20-%20PDD/aeccde_app/aeccde_app/lib/providers/user_provider.dart)
+- Verify local SQLite + remote server sign-in fallback (`remoteSignIn`) successfully downloads remote user accounts and pulls evaluation history.
 
 ## Verification Plan
 
-### Automated Tests
-- Run local validation checks for all test scripts and report generators using `python` and `node`.
-- Verify YAML linting on GitHub Actions workflow files.
-- Ensure Excel generation scripts produce valid `.xlsx` workbooks.
-
-### Manual Verification
-- Verify GitHub Actions workflow runs show green success status (`✅ PASSED`) across all jobs.
+### Automated & Manual Verification
+- **Scenario 1 (Android -> Web):** Register on Android -> Verify login on Web -> Complete evaluation on Android -> Verify results on Web.
+- **Scenario 2 (Web -> Android):** Register on Web -> Verify login on Android -> Complete evaluation on Web -> Verify results on Android.
+- **Git Sync:** Commit and push all updated files to GitHub repository (`https://github.com/varunteja45/Communication-Project---PDD.git`).
+- **GitHub Actions:** Ensure workflows run and show **GREEN SUCCESS** (`✅ PASSED`).
